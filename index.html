@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>What Do You Want To Eat?</title>
+
+  <style>
+    /* ===== THEME COLORS =====
+       CSS variables let us swap every color at once.
+       Light mode is the default; .dark on <body> overrides them. */
+    :root {
+      --bg: #f6f5f2;
+      --card: #ffffff;
+      --text: #1f1f1f;
+      --muted: #6b6b6b;
+      --border: #dcdad5;
+      --accent: #e0592a;
+      --accent-text: #ffffff;
+      --error-bg: #fdecea;
+      --error-text: #b3261e;
+      --result-bg: #fff4ee;
+    }
+
+    body.dark {
+      --bg: #17181a;
+      --card: #222326;
+      --text: #f0f0f0;
+      --muted: #a3a3a3;
+      --border: #3a3b3f;
+      --accent: #ff7a45;
+      --accent-text: #17181a;
+      --error-bg: #3b1f1d;
+      --error-text: #ffb4ab;
+      --result-bg: #2e2420;
+    }
+
+    /* ===== BASIC LAYOUT ===== */
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .container {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+
+    h1 { margin: 0; font-size: 1.6rem; }
+    .names { margin: 4px 0 0; color: var(--muted); font-size: 0.95rem; }
+    .purpose { margin: 12px 0 24px; }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .card h2 { margin: 0 0 12px; font-size: 1.1rem; }
+
+    /* ===== FORM CONTROLS ===== */
+    .add-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    input[type="text"], select {
+      padding: 10px;
+      font-size: 1rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .autocomplete-wrap { position: relative; flex: 2; min-width: 160px; }
+    #spotName { width: 100%; }
+
+    /* ===== AUTOCOMPLETE DROPDOWN ===== */
+    .suggestions {
+      display: none;             /* shown by JS when there are matches */
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      z-index: 10;
+      list-style: none;
+      margin: 0;
+      padding: 4px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+    }
+
+    .suggestions li {
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .suggestions li:hover,
+    .suggestions li.active { background: var(--result-bg); }
+    #spotType { flex: 1; min-width: 130px; }
+
+    button {
+      padding: 10px 16px;
+      font-size: 1rem;
+      border: none;
+      border-radius: 8px;
+      background: var(--accent);
+      color: var(--accent-text);
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    button:hover { opacity: 0.9; }
+
+    .pick-btn { width: 100%; padding: 14px; font-size: 1.1rem; }
+
+    /* ===== SPOT LIST ===== */
+    #spotList { list-style: none; padding: 0; margin: 12px 0 0; }
+
+    #spotList li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    #spotList li:last-child { border-bottom: none; }
+
+    .tag {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-left: 8px;
+    }
+
+    .remove-btn {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      font-size: 0.85rem;
+    }
+
+    .empty-note { color: var(--muted); margin: 12px 0 0; }
+
+    /* ===== FILTER CHECKBOXES ===== */
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+    }
+
+    .filters label { cursor: pointer; }
+
+    .filter-actions { margin-top: 10px; display: flex; gap: 8px; }
+
+    .small-btn {
+      padding: 4px 10px;
+      font-size: 0.85rem;
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    /* ===== MESSAGES & RESULT ===== */
+    .error {
+      background: var(--error-bg);
+      color: var(--error-text);
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-top: 12px;
+      display: none; /* hidden until there's an error */
+    }
+
+    #result {
+      margin-top: 16px;
+      padding: 20px;
+      border-radius: 12px;
+      background: var(--result-bg);
+      text-align: center;
+      min-height: 80px;
+    }
+
+    #result .winner { font-size: 1.6rem; font-weight: 700; margin: 4px 0; }
+    #result .placeholder { color: var(--muted); }
+    #result p { margin: 4px 0; }
+
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ===== SLOT MACHINE =====
+       The window shows 3 rows; the strip of names slides up inside it
+       and stops with the winner in the middle row. */
+    .slot-window {
+      position: relative;
+      height: 168px;             /* 3 rows x 56px */
+      max-width: 380px;
+      margin: 8px auto;
+      overflow: hidden;          /* hides names outside the window */
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+
+    .slot-item {
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 12px;
+      font-size: 1.4rem;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Fade the top and bottom rows so the middle row stands out */
+    .slot-window::before,
+    .slot-window::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 56px;
+      z-index: 2;
+      pointer-events: none;
+    }
+    .slot-window::before { top: 0; background: linear-gradient(var(--card), transparent); }
+    .slot-window::after { bottom: 0; background: linear-gradient(transparent, var(--card)); }
+
+    /* Lines marking the "winning" middle row */
+    .slot-highlight {
+      position: absolute;
+      top: 56px;
+      left: 0;
+      right: 0;
+      height: 56px;
+      border-top: 2px solid var(--accent);
+      border-bottom: 2px solid var(--accent);
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    .result-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin-top: 12px;
+    }
+
+    .secondary-btn {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .vetoed-note { font-size: 0.85rem; color: var(--muted); }
+
+    /* ===== RECOMMEND + MOOD BOOST ===== */
+    .recommend-btn { width: 100%; }
+
+    .subtext {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin: 6px 0 12px;
+    }
+
+    .boost-summary {
+      margin: 12px 0 0;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: var(--bg);
+      font-size: 0.9rem;
+    }
+
+    .odds {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-right: 10px;
+    }
+
+    .odds.boosted { color: var(--accent); font-weight: 700; }
+
+    .spot-right { display: flex; align-items: center; }
+
+    /* ===== LIGHT/DARK PILL TOGGLE ===== */
+    .theme-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .pill {
+      position: relative;
+      width: 48px;
+      height: 26px;
+      background: var(--border);
+      border-radius: 999px;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+    }
+
+    /* The sliding circle inside the pill */
+    .pill::after {
+      content: "";
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 20px;
+      height: 20px;
+      background: var(--card);
+      border-radius: 50%;
+      transition: left 0.2s;
+    }
+
+    body.dark .pill { background: var(--accent); }
+    body.dark .pill::after { left: 25px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ===== HEADER (group names + theme toggle) ===== -->
+    <header>
+      <div>
+        <h1>What Do You Want To Eat?</h1>
+        <p class="names">Cam G.</p>
+      </div>
+
+      <div class="theme-toggle">
+        <span>Dark mode</span>
+        <button class="pill" id="themeToggle" aria-label="Toggle dark mode"></button>
+      </div>
+    </header>
+
+    <p class="purpose">This app helps your group decide where to eat by randomly picking from a list of spots you add, with better odds for the types of food you're in the mood for.</p>
+
+    <!-- ===== STEP 1: ADD SPOTS ===== -->
+    <section class="card">
+      <h2>1. Add spots</h2>
+      <button class="secondary-btn recommend-btn" id="recommendBtn">💡 Recommend a spot</button>
+      <p class="subtext">Fills in a suggestion below. Tap again for a different one, or hit Add to keep it.</p>
+      <div class="add-row">
+        <!-- Wrapper lets the autocomplete list sit right under the name box -->
+        <div class="autocomplete-wrap">
+          <input type="text" id="spotName" placeholder="Restaurant name (e.g., Chipotle)" autocomplete="off">
+          <ul class="suggestions" id="suggestions"></ul>
+        </div>
+        <select id="spotType"></select> <!-- options filled in by JS -->
+        <button id="addBtn">Add</button>
+      </div>
+      <div class="error" id="addError"></div>
+
+      <ul id="spotList"></ul>
+      <p class="empty-note" id="emptyNote">No spots yet. Add at least 2 to get started.</p>
+    </section>
+
+    <!-- ===== STEP 2: MOOD BOOST ===== -->
+    <section class="card">
+      <h2>2. What are you in the mood for? 🚀</h2>
+      <p class="subtext">Mood boost: spots with a checked type are <strong>3× more likely</strong> to be picked. Unchecked types can still come up, just less often.</p>
+      <div class="filters" id="filters"></div> <!-- checkboxes filled in by JS -->
+      <div class="filter-actions">
+        <button class="small-btn" id="selectAllBtn">Select all</button>
+        <button class="small-btn" id="clearAllBtn">Clear all</button>
+      </div>
+      <p class="boost-summary" id="boostSummary"></p> <!-- live odds, filled in by JS -->
+    </section>
+
+    <!-- ===== STEP 3: PICK ===== -->
+    <section class="card">
+      <h2>3. Decide</h2>
+      <button class="pick-btn" id="pickBtn">Pick a spot!</button>
+      <div class="error" id="pickError"></div>
+
+      <div id="result">
+        <p class="placeholder">Your pick will show up here.</p>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    // ===== SETTINGS =====
+    // One list of food types used for BOTH the dropdown and the filter checkboxes.
+    const FOOD_TYPES = [
+      "American", "Mexican", "Italian", "Mediterranean", "Chinese",
+      "Japanese", "Indian", "Thai", "Pizza", "Fast Food", "Other"
+    ];
+
+    // An emoji for each food type (shows as Apple-style emoji on iPhone/Mac)
+    const EMOJIS = {
+      "American": "🍔",
+      "Mexican": "🌯",
+      "Italian": "🍝",
+      "Mediterranean": "🥙",
+      "Chinese": "🥡",
+      "Japanese": "🍣",
+      "Indian": "🍛",
+      "Thai": "🍜",
+      "Pizza": "🍕",
+      "Fast Food": "🍟",
+      "Other": "🍽️"
+    };
+
+    // ===== RECOMMENDED SPOTS =====
+    // The "Recommend a spot" button picks from this list.
+    // Edit freely: just keep each type spelled exactly like FOOD_TYPES above.
+    const RECOMMENDATIONS = [
+      { name: "Chipotle", type: "Mexican" },
+      { name: "Qdoba", type: "Mexican" },
+      { name: "Anna's Taqueria", type: "Mexican" },
+      { name: "El Pelón Taqueria", type: "Mexican" },
+      { name: "Five Guys", type: "American" },
+      { name: "Shake Shack", type: "American" },
+      { name: "Tasty Burger", type: "American" },
+      { name: "The Cheesecake Factory", type: "American" },
+      { name: "Olive Garden", type: "Italian" },
+      { name: "Giacomo's", type: "Italian" },
+      { name: "Bertucci's", type: "Italian" },
+      { name: "Cava", type: "Mediterranean" },
+      { name: "Saloniki", type: "Mediterranean" },
+      { name: "Zo", type: "Mediterranean" },
+      { name: "Panda Express", type: "Chinese" },
+      { name: "P.F. Chang's", type: "Chinese" },
+      { name: "Gourmet Dumpling House", type: "Chinese" },
+      { name: "Wagamama", type: "Japanese" },
+      { name: "Santouka Ramen", type: "Japanese" },
+      { name: "Benihana", type: "Japanese" },
+      { name: "Punjab Palace", type: "Indian" },
+      { name: "Desi Dhaba", type: "Indian" },
+      { name: "Brown Sugar Cafe", type: "Thai" },
+      { name: "Dakzen", type: "Thai" },
+      { name: "Regina Pizzeria", type: "Pizza" },
+      { name: "Santarpio's", type: "Pizza" },
+      { name: "Domino's", type: "Pizza" },
+      { name: "McDonald's", type: "Fast Food" },
+      { name: "Chick-fil-A", type: "Fast Food" },
+      { name: "Wendy's", type: "Fast Food" },
+      { name: "Taco Bell", type: "Fast Food" },
+      { name: "Sweetgreen", type: "Other" },
+      { name: "Dig", type: "Other" }
+    ];
+
+    // ===== MOOD BOOST SETTING =====
+    // A spot whose type is checked counts this many times in the random draw.
+    const BOOST = 3;
+
+    // Helper: "Pizza" -> "🍕 Pizza"
+    function withEmoji(type) {
+      return (EMOJIS[type] || "🍽️") + " " + type;
+    }
+
+    // ===== LOCAL STORAGE (saves data between visits) =====
+    // localStorage only stores text, so we convert to/from JSON.
+    // try/catch keeps the app working even if the browser blocks storage.
+    const STORAGE_KEY = "whatToEatData";
+
+    function saveData() {
+      try {
+        const data = {
+          spots: spots,
+          selectedTypes: getSelectedTypes(),
+          lastPick: lastPick,
+          darkMode: document.body.classList.contains("dark")
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch (error) {
+        console.log("Could not save data:", error);
+      }
+    }
+
+    function loadData() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        return saved ? JSON.parse(saved) : null;
+      } catch (error) {
+        console.log("Could not load data:", error);
+        return null;
+      }
+    }
+
+    // This array holds every spot the user adds, e.g. { name: "Chipotle", type: "Mexican" }
+    let spots = [];
+
+    // The most recent pick, e.g. { name: "Chipotle", type: "Mexican", poolSize: 4 }
+    let lastPick = null;
+
+    // Names vetoed in the current round (cleared each time "Pick a spot!" is clicked)
+    let vetoed = [];
+
+    // True while the slot machine is spinning, so buttons can't be spammed
+    let isSpinning = false;
+
+    // Slot machine settings
+    const ROW_HEIGHT = 56;      // must match .slot-item height in the CSS
+    const SPIN_ROWS = 30;       // how many names fly by before landing
+    const SPIN_TIME = 2200;     // spin length in milliseconds
+
+    // ===== GRAB ELEMENTS FROM THE PAGE =====
+    const spotNameInput = document.getElementById("spotName");
+    const spotTypeSelect = document.getElementById("spotType");
+    const addBtn = document.getElementById("addBtn");
+    const addError = document.getElementById("addError");
+    const spotList = document.getElementById("spotList");
+    const emptyNote = document.getElementById("emptyNote");
+    const filtersDiv = document.getElementById("filters");
+    const pickBtn = document.getElementById("pickBtn");
+    const pickError = document.getElementById("pickError");
+    const resultDiv = document.getElementById("result");
+    const themeToggle = document.getElementById("themeToggle");
+
+    // ===== BUILD THE DROPDOWN AND CHECKBOXES =====
+    FOOD_TYPES.forEach(function (type) {
+      // Add an <option> to the type dropdown
+      const option = document.createElement("option");
+      option.value = type;
+      option.textContent = withEmoji(type);
+      spotTypeSelect.appendChild(option);
+
+      // Add a checkbox to the filter section (checked by default)
+      const label = document.createElement("label");
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.value = type;
+      checkbox.checked = false; // nothing boosted until the user picks a mood
+      label.appendChild(checkbox);
+      label.append(" " + withEmoji(type));
+      filtersDiv.appendChild(label);
+    });
+
+    // ===== HELPER: SHOW / HIDE ERROR MESSAGES =====
+    function showError(element, message) {
+      element.textContent = message;
+      element.style.display = "block";
+    }
+
+    function hideError(element) {
+      element.textContent = "";
+      element.style.display = "none";
+    }
+
+    // ===== ADD A SPOT =====
+    function addSpot() {
+      const name = spotNameInput.value.trim(); // trim() removes extra spaces
+      const type = spotTypeSelect.value;
+
+      // Error: blank name
+      if (name === "") {
+        showError(addError, "Please enter a restaurant name.");
+        return;
+      }
+
+      // Error: duplicate (ignores capitalization, so "chipotle" = "Chipotle")
+      const alreadyExists = spots.some(function (spot) {
+        return spot.name.toLowerCase() === name.toLowerCase();
+      });
+      if (alreadyExists) {
+        showError(addError, name + " is already on your list.");
+        return;
+      }
+
+      // All good: add it, clear the box, redraw the list, save
+      spots.push({ name: name, type: type });
+      hideError(addError);
+      spotNameInput.value = "";
+      spotNameInput.focus();
+      renderList();
+      saveData();
+    }
+
+    // ===== REMOVE A SPOT =====
+    function removeSpot(index) {
+      spots.splice(index, 1); // remove 1 item at this position
+      renderList();
+      saveData();
+    }
+
+    // ===== DRAW THE LIST ON THE PAGE =====
+    function renderList() {
+      spotList.innerHTML = ""; // clear the old list first
+
+      spots.forEach(function (spot, index) {
+        const li = document.createElement("li");
+
+        // Name + type tag (textContent keeps user input safe)
+        const info = document.createElement("span");
+        info.textContent = EMOJIS[spot.type] + " " + spot.name;
+        const tag = document.createElement("span");
+        tag.className = "tag";
+        tag.textContent = spot.type;
+        info.appendChild(tag);
+
+        // Remove button for this spot
+        const removeBtn = document.createElement("button");
+        removeBtn.className = "remove-btn";
+        removeBtn.textContent = "Remove";
+        removeBtn.addEventListener("click", function () {
+          removeSpot(index);
+        });
+
+        // Odds badge (orange when this spot is mood-boosted)
+        const odds = document.createElement("span");
+        odds.className = "odds";
+        odds.textContent = getOdds(spot) + "%";
+        if (getSelectedTypes().includes(spot.type)) {
+          odds.classList.add("boosted");
+          odds.textContent = "🚀 " + odds.textContent;
+        }
+
+        const right = document.createElement("div");
+        right.className = "spot-right";
+        right.appendChild(odds);
+        right.appendChild(removeBtn);
+
+        li.appendChild(info);
+        li.appendChild(right);
+        spotList.appendChild(li);
+      });
+
+      updateBoostSummary();
+
+      // Show the "no spots yet" note only when the list is empty
+      emptyNote.style.display = spots.length === 0 ? "block" : "none";
+    }
+
+    // ===== GET THE TYPES THE USER CHECKED =====
+    function getSelectedTypes() {
+      const checked = filtersDiv.querySelectorAll("input:checked");
+      return Array.from(checked).map(function (box) {
+        return box.value;
+      });
+    }
+
+    // ===== PICK A RANDOM SPOT =====
+    function pickSpot() {
+      if (isSpinning) return; // ignore clicks mid-spin
+      hideError(pickError);
+
+      // Error: fewer than 2 spots total
+      if (spots.length < 2) {
+        showError(pickError, "Not enough spots to eat! Add at least 2 spots first.");
+        return;
+      }
+
+      // New round: forget old vetoes, then spin using every spot
+      vetoed = [];
+      spin(getPool());
+    }
+
+    // ===== THE CURRENT POOL: every spot except ones vetoed this round =====
+    function getPool() {
+      return spots.filter(function (spot) {
+        return !vetoed.includes(spot.name);
+      });
+    }
+
+    // ===== MOOD BOOST: WEIGHTED RANDOM PICK =====
+    // Each spot gets a "weight": BOOST if its type is checked, otherwise 1.
+    // Think of it as tickets in a hat: boosted spots get 3 tickets, others get 1.
+    function getWeight(spot, selectedTypes) {
+      return selectedTypes.includes(spot.type) ? BOOST : 1;
+    }
+
+    function weightedPick(pool) {
+      const selectedTypes = getSelectedTypes();
+
+      // Add up all the tickets
+      let totalWeight = 0;
+      pool.forEach(function (spot) {
+        totalWeight += getWeight(spot, selectedTypes);
+      });
+
+      // Draw a random ticket number, then walk the list until we reach it
+      let ticket = Math.random() * totalWeight;
+      for (let i = 0; i < pool.length; i++) {
+        ticket -= getWeight(pool[i], selectedTypes);
+        if (ticket < 0) return pool[i];
+      }
+      return pool[pool.length - 1]; // safety net (rounding)
+    }
+
+    // Each spot's chance of being picked, as a whole-number percent
+    function getOdds(spot) {
+      const selectedTypes = getSelectedTypes();
+      let totalWeight = 0;
+      spots.forEach(function (s) {
+        totalWeight += getWeight(s, selectedTypes);
+      });
+      return Math.round((getWeight(spot, selectedTypes) / totalWeight) * 100);
+    }
+
+    // ===== LIVE SUMMARY UNDER THE MOOD CHECKBOXES =====
+    function updateBoostSummary() {
+      const selectedTypes = getSelectedTypes();
+      const boostedSpots = spots.filter(function (spot) {
+        return selectedTypes.includes(spot.type);
+      });
+
+      let message;
+      if (spots.length === 0) {
+        message = "Add some spots to see the odds.";
+      } else if (selectedTypes.length === 0) {
+        message = "No mood selected: every spot has an equal chance.";
+      } else if (boostedSpots.length === 0) {
+        message = "None of your spots match that mood yet. Try 💡 Recommend a spot!";
+      } else if (boostedSpots.length === spots.length) {
+        message = "Every spot matches your mood, so the odds are equal.";
+      } else {
+        // Boosted tickets divided by all tickets
+        const boostedTickets = boostedSpots.length * BOOST;
+        const totalTickets = boostedTickets + (spots.length - boostedSpots.length);
+        const boostedChance = Math.round((boostedTickets / totalTickets) * 100);
+        const evenChance = Math.round((boostedSpots.length / spots.length) * 100);
+        message = "🚀 " + boostedChance + "% chance of landing on your mood (would be " + evenChance + "% without the boost).";
+      }
+      document.getElementById("boostSummary").textContent = message;
+    }
+
+    // ===== RECOMMEND A SPOT =====
+    // Fills in the name box and type dropdown. Does NOT add it to the list;
+    // the user still has to click Add.
+    function recommendSpot() {
+      hideError(addError);
+
+      // Skip spots already on the list, and the one currently shown in the box
+      const currentName = spotNameInput.value.trim().toLowerCase();
+      const options = RECOMMENDATIONS.filter(function (rec) {
+        const onList = spots.some(function (spot) {
+          return spot.name.toLowerCase() === rec.name.toLowerCase();
+        });
+        return !onList && rec.name.toLowerCase() !== currentName;
+      });
+
+      if (options.length === 0) {
+        showError(addError, "You've already added every recommended spot! 🎉");
+        return;
+      }
+
+      const rec = options[Math.floor(Math.random() * options.length)];
+      spotNameInput.value = rec.name;
+      spotTypeSelect.value = rec.type;
+    }
+
+    // ===== REROLL: spin again, the same spot CAN come up again =====
+    function reroll() {
+      if (isSpinning) return;
+      hideError(pickError);
+
+      const pool = getPool();
+      if (pool.length === 0) {
+        showError(pickError, "No spots left to pick from. Hit \"Pick a spot!\" to start over.");
+        return;
+      }
+      spin(pool);
+    }
+
+    // ===== VETO: remove this spot from the round, then spin again =====
+    function veto() {
+      if (isSpinning || !lastPick) return;
+      hideError(pickError);
+
+      vetoed.push(lastPick.name);
+      const pool = getPool();
+
+      if (pool.length === 0) {
+        resultDiv.innerHTML = "";
+        const msg = document.createElement("p");
+        msg.className = "placeholder";
+        msg.textContent = "Everything's been vetoed! 😅 Hit \"Pick a spot!\" to start over.";
+        resultDiv.appendChild(msg);
+        lastPick = null;
+        saveData();
+        return;
+      }
+      spin(pool);
+    }
+
+    // ===== HELPER: enable/disable the buttons while spinning =====
+    function setButtonsDisabled(isDisabled) {
+      pickBtn.disabled = isDisabled;
+      resultDiv.querySelectorAll("button").forEach(function (btn) {
+        btn.disabled = isDisabled;
+      });
+    }
+
+    // ===== HELPER: make one row of the slot strip =====
+    function makeSlotItem(spot) {
+      const item = document.createElement("div");
+      item.className = "slot-item";
+      item.textContent = EMOJIS[spot.type] + " " + spot.name;
+      return item;
+    }
+
+    // ===== SLOT MACHINE SPIN =====
+    function spin(pool) {
+      isSpinning = true;
+      setButtonsDisabled(true);
+
+      // Decide the winner FIRST, then animate toward it
+      const winner = weightedPick(pool);
+
+      // Build the output area: intro text + slot window
+      resultDiv.innerHTML = "";
+      const intro = document.createElement("p");
+      intro.textContent = "Spinning... 🎰";
+      resultDiv.appendChild(intro);
+
+      const slotWindow = document.createElement("div");
+      slotWindow.className = "slot-window";
+      const strip = document.createElement("div");
+      const highlight = document.createElement("div");
+      highlight.className = "slot-highlight";
+
+      // Fill the strip: lots of random names, then the winner, then one filler
+      // (the filler sits in the bottom row when the winner lands in the middle)
+      for (let i = 0; i < SPIN_ROWS; i++) {
+        const randomSpot = weightedPick(pool);
+        strip.appendChild(makeSlotItem(randomSpot));
+      }
+      strip.appendChild(makeSlotItem(winner));
+      strip.appendChild(makeSlotItem(weightedPick(pool)));
+
+      slotWindow.appendChild(strip);
+      slotWindow.appendChild(highlight);
+      resultDiv.appendChild(slotWindow);
+
+      // The winner is row number SPIN_ROWS. Move the strip up so that row
+      // sits in the middle of the window (one row down from the top).
+      const distance = (SPIN_ROWS - 1) * ROW_HEIGHT;
+
+      // Respect users who turn off animations in their device settings
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const duration = reduceMotion ? 0 : SPIN_TIME;
+
+      // Wait one frame so the browser draws the starting position,
+      // then slide up with an "ease-out" so it slows down like a real slot machine.
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          strip.style.transition = "transform " + duration + "ms cubic-bezier(0.12, 0.8, 0.2, 1)";
+          strip.style.transform = "translateY(-" + distance + "px)";
+        });
+      });
+
+      // When the spin finishes, show the details and the Veto/Reroll buttons
+      setTimeout(function () {
+        intro.textContent = "You're eating at...";
+
+        lastPick = { name: winner.name, type: winner.type, poolSize: pool.length };
+        addResultDetails(lastPick, true);
+
+        isSpinning = false;
+        setButtonsDisabled(false);
+        saveData();
+      }, duration + 50);
+    }
+
+    // ===== DETAILS UNDER A RESULT (type, pool size, vetoes, buttons) =====
+    function addResultDetails(pick, showButtons) {
+      const details = document.createElement("p");
+      details.className = "tag";
+      details.textContent = pick.type + " · picked from " + pick.poolSize + (pick.poolSize === 1 ? " spot" : " spots");
+      resultDiv.appendChild(details);
+
+      if (vetoed.length > 0) {
+        const vetoNote = document.createElement("p");
+        vetoNote.className = "vetoed-note";
+        vetoNote.textContent = "🚫 Vetoed: " + vetoed.join(", ");
+        resultDiv.appendChild(vetoNote);
+      }
+
+      if (showButtons) {
+        const actions = document.createElement("div");
+        actions.className = "result-actions";
+
+        const vetoBtn = document.createElement("button");
+        vetoBtn.className = "secondary-btn";
+        vetoBtn.textContent = "🚫 Veto";
+        vetoBtn.title = "Remove this spot for this round and spin again";
+        vetoBtn.addEventListener("click", veto);
+
+        const rerollBtn = document.createElement("button");
+        rerollBtn.className = "secondary-btn";
+        rerollBtn.textContent = "🔄 Reroll";
+        rerollBtn.title = "Spin again (this spot can come up again)";
+        rerollBtn.addEventListener("click", reroll);
+
+        actions.appendChild(vetoBtn);
+        actions.appendChild(rerollBtn);
+        resultDiv.appendChild(actions);
+      }
+    }
+
+    // ===== SHOW A SAVED RESULT (no animation, used when the page loads) =====
+    function showResult(pick, introText) {
+      resultDiv.innerHTML = "";
+      const intro = document.createElement("p");
+      intro.textContent = introText;
+      const winnerName = document.createElement("p");
+      winnerName.className = "winner";
+      winnerName.textContent = EMOJIS[pick.type] + " " + pick.name;
+      resultDiv.appendChild(intro);
+      resultDiv.appendChild(winnerName);
+      addResultDetails(pick, true); // Veto/Reroll still work after reopening
+    }
+
+    // ===== SELECT ALL / CLEAR ALL FILTERS =====
+    function setAllFilters(isChecked) {
+      filtersDiv.querySelectorAll("input").forEach(function (box) {
+        box.checked = isChecked;
+      });
+      renderList(); // odds change when the mood changes
+      saveData();
+    }
+
+    // ===== LIGHT / DARK MODE =====
+    function toggleTheme() {
+      document.body.classList.toggle("dark");
+      saveData();
+    }
+
+    // ===== CONNECT BUTTONS TO FUNCTIONS =====
+    addBtn.addEventListener("click", addSpot);
+    pickBtn.addEventListener("click", pickSpot);
+    themeToggle.addEventListener("click", toggleTheme);
+    document.getElementById("selectAllBtn").addEventListener("click", function () { setAllFilters(true); });
+    document.getElementById("clearAllBtn").addEventListener("click", function () { setAllFilters(false); });
+
+    // ===== AUTOCOMPLETE =====
+    // After 3+ letters, show recommended spots whose name contains what was typed.
+    const suggestionsList = document.getElementById("suggestions");
+    const MIN_LETTERS = 3;
+    let currentMatches = [];   // spots shown in the dropdown right now
+    let activeIndex = -1;      // which one is highlighted (-1 = none)
+
+    function updateSuggestions() {
+      const typed = spotNameInput.value.trim().toLowerCase();
+
+      // Not enough letters yet: hide the dropdown
+      if (typed.length < MIN_LETTERS) {
+        hideSuggestions();
+        return;
+      }
+
+      // Find matches that aren't already on the list (max 5)
+      currentMatches = RECOMMENDATIONS.filter(function (rec) {
+        const name = rec.name.toLowerCase();
+        const onList = spots.some(function (spot) {
+          return spot.name.toLowerCase() === name;
+        });
+        return name.includes(typed) && name !== typed && !onList;
+      }).slice(0, 5);
+
+      if (currentMatches.length === 0) {
+        hideSuggestions();
+        return;
+      }
+
+      // Draw the dropdown
+      suggestionsList.innerHTML = "";
+      activeIndex = -1;
+      currentMatches.forEach(function (rec, index) {
+        const li = document.createElement("li");
+        li.textContent = EMOJIS[rec.type] + " " + rec.name;
+        // "mousedown" fires before the box loses focus, so the click isn't lost
+        li.addEventListener("mousedown", function (event) {
+          event.preventDefault();
+          chooseSuggestion(index);
+        });
+        suggestionsList.appendChild(li);
+      });
+      suggestionsList.style.display = "block";
+    }
+
+    // Fill the name AND type from the chosen suggestion (user still clicks Add)
+    function chooseSuggestion(index) {
+      const rec = currentMatches[index];
+      spotNameInput.value = rec.name;
+      spotTypeSelect.value = rec.type;
+      hideSuggestions();
+      spotNameInput.focus();
+    }
+
+    function hideSuggestions() {
+      suggestionsList.style.display = "none";
+      suggestionsList.innerHTML = "";
+      currentMatches = [];
+      activeIndex = -1;
+    }
+
+    // Highlight a suggestion when using the arrow keys
+    function highlight(index) {
+      const items = suggestionsList.querySelectorAll("li");
+      items.forEach(function (item, i) {
+        item.classList.toggle("active", i === index);
+      });
+      activeIndex = index;
+    }
+
+    spotNameInput.addEventListener("input", function () {
+      hideError(addError);
+      updateSuggestions();
+    });
+
+    // Close the dropdown when the user clicks away from the name box
+    spotNameInput.addEventListener("blur", hideSuggestions);
+
+    // Keyboard: arrows move, Enter picks a suggestion (or adds the spot), Escape closes
+    spotNameInput.addEventListener("keydown", function (event) {
+      const isOpen = currentMatches.length > 0;
+
+      if (event.key === "ArrowDown" && isOpen) {
+        event.preventDefault();
+        highlight((activeIndex + 1) % currentMatches.length);
+      } else if (event.key === "ArrowUp" && isOpen) {
+        event.preventDefault();
+        highlight((activeIndex - 1 + currentMatches.length) % currentMatches.length);
+      } else if (event.key === "Escape") {
+        hideSuggestions();
+      } else if (event.key === "Enter") {
+        if (isOpen && activeIndex >= 0) {
+          chooseSuggestion(activeIndex);
+        } else {
+          hideSuggestions();
+          addSpot();
+        }
+      }
+    });
+
+    // Save whenever a single filter checkbox is clicked
+    // (and redraw the list so the odds update)
+    filtersDiv.addEventListener("change", function () {
+      renderList();
+      saveData();
+    });
+
+    document.getElementById("recommendBtn").addEventListener("click", recommendSpot);
+
+    // ===== RESTORE SAVED DATA WHEN THE PAGE LOADS =====
+    const saved = loadData();
+    if (saved) {
+      // Spots (keep only valid entries, just in case)
+      if (Array.isArray(saved.spots)) {
+        spots = saved.spots.filter(function (spot) {
+          return spot && typeof spot.name === "string" && FOOD_TYPES.includes(spot.type);
+        });
+      }
+
+      // Filter checkboxes
+      if (Array.isArray(saved.selectedTypes)) {
+        filtersDiv.querySelectorAll("input").forEach(function (box) {
+          box.checked = saved.selectedTypes.includes(box.value);
+        });
+      }
+
+      // Theme
+      if (saved.darkMode) {
+        document.body.classList.add("dark");
+      }
+
+      // Last pick
+      if (saved.lastPick && EMOJIS[saved.lastPick.type]) {
+        lastPick = saved.lastPick;
+        showResult(lastPick, "Last time you picked...");
+      }
+    }
+
+    // Draw the list when the page first loads
+    renderList();
+  </script>
+</body>
+</html>
